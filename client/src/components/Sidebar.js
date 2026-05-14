@@ -25,6 +25,20 @@ export default function Sidebar({ currentPage, setCurrentPage, onLogout }) {
           <span>🤖</span>
           <span>AI Center</span>
         </button>
+        <button
+          className={`sidebar-item ${currentPage === 'ai-tools' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('ai-tools')}
+        >
+          <span>🧠</span>
+          <span>AI Tools</span>
+        </button>
+        <button
+          className={`sidebar-item ${currentPage === 'public-templates' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('public-templates')}
+        >
+          <span>🌐</span>
+          <span>Marketplace</span>
+        </button>
       </div>
 
       <div className="sidebar-section">

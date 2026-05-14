@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
+import Register from './pages/Register';
+import PublicTemplates from './pages/PublicTemplates';
 import Dashboard from './pages/Dashboard';
 import FeaturePage from './pages/FeaturePage';
 import AICenter from './pages/AICenter';
+import AIToolsPage from './pages/AIToolsPage';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
 
@@ -30,7 +33,13 @@ function App() {
   if (!token) {
     return (
       <>
-        <Login onLogin={handleLogin} showToast={showToast} />
+        <Router>
+          <Routes>
+            <Route path="/register" element={<Register onLogin={handleLogin} showToast={showToast} />} />
+            <Route path="/templates" element={<PublicTemplates showToast={showToast} />} />
+            <Route path="*" element={<Login onLogin={handleLogin} showToast={showToast} />} />
+          </Routes>
+        </Router>
         {toast && <Toast message={toast.message} type={toast.type} />}
       </>
     );
@@ -42,7 +51,9 @@ function App() {
       <div className="main-content">
         {currentPage === 'dashboard' && <Dashboard setCurrentPage={setCurrentPage} />}
         {currentPage === 'ai-center' && <AICenter showToast={showToast} />}
-        {currentPage !== 'dashboard' && currentPage !== 'ai-center' && (
+        {currentPage === 'ai-tools' && <AIToolsPage showToast={showToast} />}
+        {currentPage === 'public-templates' && <PublicTemplates showToast={showToast} setCurrentPage={setCurrentPage} />}
+        {currentPage !== 'dashboard' && currentPage !== 'ai-center' && currentPage !== 'ai-tools' && currentPage !== 'public-templates' && (
           <FeaturePage feature={currentPage} showToast={showToast} setCurrentPage={setCurrentPage} />
         )}
       </div>

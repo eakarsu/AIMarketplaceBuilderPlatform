@@ -7,17 +7,26 @@ import AIOutput from '../components/AIOutput';
 export default function FeaturePage({ feature, showToast, setCurrentPage }) {
   const config = features[feature];
   const [items, setItems] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [page, setPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
+  const [publishing, setPublishing] = useState(null);
 
-  const fetchItems = useCallback(async () => {
+  const fetchItems = useCallback(async (p = 1) => {
     setLoading(true);
     try {
-      const { data } = await api.get(config.endpoint);
-      setItems(data);
+      const { data } = await api.get(`${config.endpoint}?page=${p}&limit=20`);
+      if (data && data.data && data.pagination) {
+        setItems(data.data);
+        setPagination(data.pagination);
+      } else {
+        setItems(Array.isArray(data) ? data : []);
+        setPagination(null);
+      }
     } catch (err) {
       showToast('Failed to load data', 'error');
     } finally {
@@ -28,17 +37,22 @@ export default function FeaturePage({ feature, showToast, setCurrentPage }) {
   useEffect(() => {
     setSelectedItem(null);
     setShowModal(false);
-    fetchItems();
-  }, [feature, fetchItems]);
+    setPage(1);
+    setPagination(null);
+  }, [feature]);
+
+  useEffect(() => {
+    fetchItems(page);
+  }, [feature, page, fetchItems]);
 
   const handleCreate = async (formData) => {
     try {
       await api.post(config.endpoint, formData);
       showToast('Item created successfully');
       setShowModal(false);
-      fetchItems();
+      fetchItems(page);
     } catch (err) {
-      showToast('Failed to create item', 'error');
+      showToast(err.response?.data?.error || 'Failed to create item', 'error');
     }
   };
 
@@ -48,13 +62,13 @@ export default function FeaturePage({ feature, showToast, setCurrentPage }) {
       showToast('Item updated successfully');
       setShowModal(false);
       setEditItem(null);
-      fetchItems();
+      fetchItems(page);
       if (selectedItem && selectedItem.id === editItem.id) {
         const { data } = await api.get(`${config.endpoint}/${editItem.id}`);
         setSelectedItem(data);
       }
     } catch (err) {
-      showToast('Failed to update item', 'error');
+      showToast(err.response?.data?.error || 'Failed to update item', 'error');
     }
   };
 
@@ -64,9 +78,9 @@ export default function FeaturePage({ feature, showToast, setCurrentPage }) {
       await api.delete(`${config.endpoint}/${id}`);
       showToast('Item deleted successfully');
       if (selectedItem && selectedItem.id === id) setSelectedItem(null);
-      fetchItems();
+      fetchItems(page);
     } catch (err) {
-      showToast('Failed to delete item', 'error');
+      showToast(err.response?.data?.error || 'Failed to delete item', 'error');
     }
   };
 
@@ -76,11 +90,27 @@ export default function FeaturePage({ feature, showToast, setCurrentPage }) {
       const { data } = await api.post(`${config.endpoint}/${id}/generate`);
       showToast('AI content generated successfully');
       setSelectedItem(data);
-      fetchItems();
+      fetchItems(page);
     } catch (err) {
       showToast(err.response?.data?.error || 'AI generation failed', 'error');
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const handlePublish = async (id, currentPublished) => {
+    setPublishing(id);
+    try {
+      const { data } = await api.put(`${config.endpoint}/${id}/publish`);
+      showToast(data.published ? 'Published to marketplace!' : 'Unpublished from marketplace');
+      if (selectedItem && selectedItem.id === id) {
+        setSelectedItem(data);
+      }
+      fetchItems(page);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to toggle publish', 'error');
+    } finally {
+      setPublishing(null);
     }
   };
 
@@ -106,7 +136,7 @@ export default function FeaturePage({ feature, showToast, setCurrentPage }) {
         </div>
         <div className="page-body">
           <button className="back-btn" onClick={() => setSelectedItem(null)}>
-            ← Back to list
+            Back to list
           </button>
           <div className="detail-view">
             <div className="detail-header">
@@ -114,6 +144,17 @@ export default function FeaturePage({ feature, showToast, setCurrentPage }) {
               <div className="detail-actions">
                 <button className="btn btn-ai btn-sm" onClick={() => handleGenerate(selectedItem.id)} disabled={aiLoading}>
                   {aiLoading ? <span className="spinner"></span> : '✨ Generate AI'}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  style={{
+                    background: selectedItem.published ? '#f59e0b' : '#6366f1',
+                    color: 'white',
+                  }}
+                  onClick={() => handlePublish(selectedItem.id, selectedItem.published)}
+                  disabled={publishing === selectedItem.id}
+                >
+                  {publishing === selectedItem.id ? '...' : selectedItem.published ? '📤 Unpublish' : '🌐 Publish'}
                 </button>
                 <button className="btn btn-primary btn-sm" onClick={() => openEdit(selectedItem)}>Edit</button>
                 <button className="btn btn-danger btn-sm" onClick={() => handleDelete(selectedItem.id)}>Delete</button>
@@ -137,6 +178,20 @@ export default function FeaturePage({ feature, showToast, setCurrentPage }) {
                 <div className="detail-field">
                   <label>AI Generated Content</label>
                   <AIOutput content={selectedItem[config.aiField]} />
+                </div>
+              )}
+
+              {selectedItem.published && (
+                <div style={{
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  fontSize: 13,
+                  color: '#16a34a',
+                  marginTop: 12,
+                }}>
+                  This item is published to the public marketplace.
                 </div>
               )}
             </div>
@@ -166,10 +221,15 @@ export default function FeaturePage({ feature, showToast, setCurrentPage }) {
       <div className="page-body">
         <div className="data-table-container">
           <div className="table-header">
-            <h3>{items.length} Items</h3>
-            <button className="btn btn-primary" onClick={openCreate}>
-              + New Item
-            </button>
+            <h3>{pagination ? `${pagination.total} Items` : `${items.length} Items`}</h3>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setCurrentPage('public-templates')}>
+                🌐 Browse Templates
+              </button>
+              <button className="btn btn-primary" onClick={openCreate}>
+                + New Item
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -183,52 +243,98 @@ export default function FeaturePage({ feature, showToast, setCurrentPage }) {
               <p>No items yet. Create your first one!</p>
             </div>
           ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  {config.columns.map(col => (
-                    <th key={col}>{config.columnLabels[col]}</th>
-                  ))}
-                  <th>AI</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map(item => (
-                  <tr key={item.id} onClick={() => setSelectedItem(item)}>
+            <>
+              <table className="data-table">
+                <thead>
+                  <tr>
                     {config.columns.map(col => (
-                      <td key={col} style={col === 'status' ? {} : {}}>
-                        {col === 'status' ? (
-                          <span className={`card-badge ${item[col] === 'active' ? 'green' : ''}`}>
-                            {item[col]}
-                          </span>
-                        ) : config.formatValue ? (
-                          config.formatValue(col, item[col])
+                      <th key={col}>{config.columnLabels[col]}</th>
+                    ))}
+                    <th>AI</th>
+                    <th>Published</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map(item => (
+                    <tr key={item.id} onClick={() => setSelectedItem(item)}>
+                      {config.columns.map(col => (
+                        <td key={col}>
+                          {col === 'status' ? (
+                            <span className={`card-badge ${item[col] === 'active' ? 'green' : ''}`}>
+                              {item[col]}
+                            </span>
+                          ) : config.formatValue ? (
+                            config.formatValue(col, item[col])
+                          ) : (
+                            String(item[col] || '—').substring(0, 60)
+                          )}
+                        </td>
+                      ))}
+                      <td>
+                        {item[config.aiField] ? (
+                          <span className="card-badge purple">Generated</span>
                         ) : (
-                          String(item[col] || '—').substring(0, 60)
+                          <span className="card-badge">Pending</span>
                         )}
                       </td>
-                    ))}
-                    <td>
-                      {item[config.aiField] ? (
-                        <span className="card-badge purple">Generated</span>
-                      ) : (
-                        <span className="card-badge">Pending</span>
-                      )}
-                    </td>
-                    <td onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn btn-ai btn-sm" onClick={() => { setSelectedItem(item); handleGenerate(item.id); }}>
-                          ✨ AI
-                        </button>
-                        <button className="btn btn-primary btn-sm" onClick={() => openEdit(item)}>Edit</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item.id)}>Del</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <td>
+                        {item.published ? (
+                          <span className="card-badge green">Public</span>
+                        ) : (
+                          <span className="card-badge">Private</span>
+                        )}
+                      </td>
+                      <td onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn-ai btn-sm" onClick={() => { setSelectedItem(item); handleGenerate(item.id); }}>
+                            ✨ AI
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            style={{
+                              background: item.published ? '#f59e0b' : '#6366f1',
+                              color: 'white',
+                              fontSize: 11,
+                              padding: '4px 8px',
+                            }}
+                            onClick={() => handlePublish(item.id, item.published)}
+                            disabled={publishing === item.id}
+                          >
+                            {publishing === item.id ? '...' : item.published ? 'Unpub' : '🌐 Pub'}
+                          </button>
+                          <button className="btn btn-primary btn-sm" onClick={() => openEdit(item)}>Edit</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item.id)}>Del</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Pagination Controls */}
+              {pagination && pagination.totalPages > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 0', justifyContent: 'flex-end' }}>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    disabled={pagination.page <= 1}
+                    onClick={() => setPage(p => p - 1)}
+                  >
+                    Prev
+                  </button>
+                  <span style={{ fontSize: 14, color: '#64748b' }}>
+                    Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+                  </span>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    disabled={pagination.page >= pagination.totalPages}
+                    onClick={() => setPage(p => p + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
