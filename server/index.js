@@ -664,6 +664,8 @@ JSON: { "risk_score": number, "risk_level": "low|medium|high", "flags": [{"signa
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.use('/api/escrow-dispute-score', require('./routes/escrowDisputeScore'));
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
