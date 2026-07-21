@@ -8,6 +8,11 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
 
 const pool = require('./db');
 const { callOpenRouter } = require('./openrouter');
+const { validateRuntime } = require('./governance/runtime');
+const governanceRouter = require('./governance/router');
+const { createProviderGate } = require('./governance/providerGate');
+
+validateRuntime();
 
 if (!process.env.JWT_SECRET) {
   console.error('FATAL: JWT_SECRET environment variable is not set');
@@ -18,11 +23,10 @@ const app = express();
 const PORT = process.env.BACKEND_PORT || 3001;
 
 app.use(helmet());
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
-  credentials: true,
-}));
+const allowedOrigins = String(process.env.CORS_ORIGINS || process.env.CLIENT_URL || 'http://localhost:3000').split(',').map((value) => value.trim()).filter(Boolean);
+app.use(cors({ origin:(origin,callback)=>!origin||allowedOrigins.includes(origin)?callback(null,true):callback(new Error('Origin not allowed by CORS')),credentials:true }));
 app.use(express.json());
+app.use(createProviderGate(['/api/ai','/api/ai-center','/api/marketplace-curator-agent','/api/personalized-recommender-stream','/api/dispute-service-agent','/api/creator-success-bot','/api/white-label-vertical']));
 
 // ============ AI RATE LIMITER ============
 const rateLimit = require('express-rate-limit');
@@ -100,7 +104,7 @@ async function setupDatabase() {
   }
 }
 
-setupDatabase();
+if (process.env.ENABLE_LEGACY_SCHEMA_BOOTSTRAP === 'true') setupDatabase();
 
 // ============ AUTH ROUTES ============
 app.post('/api/auth/login', async (req, res) => {
@@ -665,6 +669,7 @@ JSON: { "risk_score": number, "risk_level": "low|medium|high", "flags": [{"signa
 });
 
 app.use('/api/escrow-dispute-score', require('./routes/escrowDisputeScore'));
+app.use('/api/governed-marketplace-orders', governanceRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
@@ -677,17 +682,4 @@ app.use('/api/dispute-service-agent', require('./routes/dispute-service-agent'))
 app.use('/api/creator-success-bot', require('./routes/creator-success-bot'));
 app.use('/api/white-label-vertical', require('./routes/white-label-vertical'));
 
-// === Batch 05 Gaps & Frontend Mounts ===
-try { const _gap_ai_content_quality_scorer = require('./routes/gap-ai-content-quality-scorer'); app.use('/api/gap-ai-content-quality-scorer', _gap_ai_content_quality_scorer); } catch(e) { console.error('gap mount fail ai-content-quality-scorer:', e.message); }
-try { const _gap_ai_template_recommender = require('./routes/gap-ai-template-recommender'); app.use('/api/gap-ai-template-recommender', _gap_ai_template_recommender); } catch(e) { console.error('gap mount fail ai-template-recommender:', e.message); }
-try { const _gap_ai_version_summarizer = require('./routes/gap-ai-version-summarizer'); app.use('/api/gap-ai-version-summarizer', _gap_ai_version_summarizer); } catch(e) { console.error('gap mount fail ai-version-summarizer:', e.message); }
-try { const _gap_ai_buyer_intent = require('./routes/gap-ai-buyer-intent'); app.use('/api/gap-ai-buyer-intent', _gap_ai_buyer_intent); } catch(e) { console.error('gap mount fail ai-buyer-intent:', e.message); }
-try { const _gap_review = require('./routes/gap-review'); app.use('/api/gap-review', _gap_review); } catch(e) { console.error('gap mount fail review:', e.message); }
-try { const _gap_search = require('./routes/gap-search'); app.use('/api/gap-search', _gap_search); } catch(e) { console.error('gap mount fail search:', e.message); }
-try { const _gap_seller = require('./routes/gap-seller'); app.use('/api/gap-seller', _gap_seller); } catch(e) { console.error('gap mount fail seller:', e.message); }
-try { const _gap_payment = require('./routes/gap-payment'); app.use('/api/gap-payment', _gap_payment); } catch(e) { console.error('gap mount fail payment:', e.message); }
-try { const _gap_notifications = require('./routes/gap-notifications'); app.use('/api/gap-notifications', _gap_notifications); } catch(e) { console.error('gap mount fail notifications:', e.message); }
-try { const _gap_order = require('./routes/gap-order'); app.use('/api/gap-order', _gap_order); } catch(e) { console.error('gap mount fail order:', e.message); }
-try { const _gap_webhooks = require('./routes/gap-webhooks'); app.use('/api/gap-webhooks', _gap_webhooks); } catch(e) { console.error('gap mount fail webhooks:', e.message); }
-try { const _gap_dispute = require('./routes/gap-dispute'); app.use('/api/gap-dispute', _gap_dispute); } catch(e) { console.error('gap mount fail dispute:', e.message); }
-// === End Batch 05 Mounts ===
+// Generated gap routes are quarantined: no mounts until durable provider contracts and acceptance tests exist.
