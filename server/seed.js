@@ -3,6 +3,12 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
 
+function requireDemoPassword() {
+  const password = process.env.DEMO_PASSWORD || process.env.SEED_DEMO_PASSWORD || process.env.DEMO_SEED_PASSWORD || '';
+  if (password.length < 12 || password.length > 1024) throw new Error('DEMO_PASSWORD must contain 12-1024 characters');
+  return password;
+}
+
 async function seed() {
   const client = await pool.connect();
   try {
@@ -12,7 +18,7 @@ async function seed() {
     console.log('Schema created successfully');
 
     // Seed user
-    const hashedPassword = await bcrypt.hash('password123', 10);
+    const hashedPassword = await bcrypt.hash(requireDemoPassword(), 10);
     await client.query(
       `INSERT INTO users (email, password, name) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING`,
       ['admin@aimarket.com', hashedPassword, 'Admin User']
