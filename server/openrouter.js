@@ -2,7 +2,9 @@ const fetch = require('node-fetch');
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
 async function callOpenRouter(systemPrompt, userMessage, maxTokens = 2048) {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY is not configured');
+  const baseUrl = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
@@ -20,11 +22,13 @@ async function callOpenRouter(systemPrompt, userMessage, maxTokens = 2048) {
     }),
   });
 
-  const data = await response.json();
-  if (data.error) {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.error) {
     throw new Error(data.error.message || 'OpenRouter API error');
   }
-  return data.choices[0].message.content;
+  const content = data.choices?.[0]?.message?.content;
+  if (!content || !String(content).trim()) throw new Error('OpenRouter returned empty content');
+  return content;
 }
 
 module.exports = { callOpenRouter };

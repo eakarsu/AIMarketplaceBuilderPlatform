@@ -26,7 +26,7 @@ app.use(helmet());
 const allowedOrigins = String(process.env.CORS_ORIGINS || process.env.CLIENT_URL || 'http://localhost:3000').split(',').map((value) => value.trim()).filter(Boolean);
 app.use(cors({ origin:(origin,callback)=>!origin||allowedOrigins.includes(origin)?callback(null,true):callback(new Error('Origin not allowed by CORS')),credentials:true }));
 app.use(express.json());
-app.use(createProviderGate(['/api/ai','/api/ai-center','/api/marketplace-curator-agent','/api/personalized-recommender-stream','/api/dispute-service-agent','/api/creator-success-bot','/api/white-label-vertical']));
+app.use(createProviderGate(['/api/marketplace-curator-agent','/api/personalized-recommender-stream','/api/dispute-service-agent','/api/creator-success-bot','/api/white-label-vertical']));
 
 // ============ AI RATE LIMITER ============
 const rateLimit = require('express-rate-limit');
@@ -145,8 +145,14 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.get('/api/auth/me', authMiddleware, (req, res) => {
-  res.json({ user: req.user });
+app.get('/api/auth/me', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, email, name, created_at FROM users WHERE id = $1 LIMIT 1', [req.user.id]);
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
+    res.json({ user: result.rows[0] });
+  } catch (_) {
+    res.status(503).json({ error: 'Authentication service unavailable' });
+  }
 });
 
 app.post('/api/auth/forgot-password', async (req, res) => {
