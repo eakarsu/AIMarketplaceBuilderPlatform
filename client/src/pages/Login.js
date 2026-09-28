@@ -60,7 +60,7 @@ export default function Login({ onLogin, showToast }) {
         <div className="quick-login">
           <p>Quick access for demo</p>
           <button type="button" className="btn" onClick={fillCredentials}>
-            Fill Demo Credentials
+            Auto Fill Demo Credentials
           </button>
         </div>
       </div>
