@@ -11,6 +11,7 @@ const { callOpenRouter } = require('./openrouter');
 const { validateRuntime } = require('./governance/runtime');
 const governanceRouter = require('./governance/router');
 const { createProviderGate } = require('./governance/providerGate');
+const { createDemoLoginHandler } = require('./demoAuth.cjs');
 
 validateRuntime();
 
@@ -35,6 +36,13 @@ const aiRateLimiter = rateLimit({
   max: 20,
   keyGenerator: (req) => req.user ? `user:${req.user.id}` : req.ip,
   message: { error: 'AI rate limit exceeded. Maximum 20 requests per hour.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const demoLoginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many demo login attempts. Try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -122,6 +130,18 @@ app.post('/api/auth/login', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// The demo route issues a normal token for the existing seeded demo account;
+// it never exposes the account password or changes account permissions.
+app.post('/api/auth/demo', demoLoginRateLimiter, createDemoLoginHandler({
+  pool,
+  demoEmail: process.env.DEMO_EMAIL || 'admin@aimarket.com',
+  signToken: (user) => jwt.sign(
+    { id: user.id, email: user.email, name: user.name },
+    process.env.JWT_SECRET,
+    { expiresIn: '24h' }
+  ),
+}));
 
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -677,6 +697,14 @@ JSON: { "risk_score": number, "risk_level": "low|medium|high", "flags": [{"signa
 app.use('/api/escrow-dispute-score', require('./routes/escrowDisputeScore'));
 app.use('/api/governed-marketplace-orders', governanceRouter);
 
+
+// Advisory AI reports only; native execution and approval routes stay unchanged.
+const aiWorkspaceSupport = require("./aiWorkspaceAdapters.cjs");
+const aiWorkspaceDatabase = require("./db.js");
+app.use('/api/report-workspace', require("./aiWorkspace.cjs").createAIWorkspaceRouter({
+  pool: aiWorkspaceDatabase, authenticateToken: authMiddleware,
+  aiRateLimiter: aiWorkspaceSupport.createWorkspaceLimiter(), features: require("./aiWorkspaceFeatures.json"),
+}));
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

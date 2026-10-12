@@ -1,8 +1,9 @@
+import NativeAIControls from "../components/NativeAIControls.jsx";
 import React, { useState } from 'react';
 import api from '../api';
 import AIOutput from '../components/AIOutput';
 
-const aiFeatures = [
+export const aiFeatures = [
   { key: 'trip-planner', icon: '✈️', label: 'Trip Planner', desc: 'Plan trips with AI' },
   { key: 'content-writer', icon: '📝', label: 'Content Writer', desc: 'Generate any content' },
   { key: 'code-assistant', icon: '💻', label: 'Code Assistant', desc: 'Write & explain code' },
@@ -61,7 +62,7 @@ export default function AICenter({ showToast }) {
   const currentFeature = aiFeatures.find(f => f.key === selectedFeature);
 
   return (
-    <>
+    <NativeAIControls busy={loading} context="MarketplaceBuilderPlatform"><>
       <div className="page-header">
         <h2>🤖 AI Center</h2>
         <p>Access all AI features in one place — Select a feature and start generating</p>
@@ -110,7 +111,7 @@ export default function AICenter({ showToast }) {
           </div>
 
           <div className="ai-chat-input">
-            <textarea
+            <textarea data-ai-field={"prompt"}
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -145,6 +146,6 @@ export default function AICenter({ showToast }) {
           </div>
         )}
       </div>
-    </>
+    </></NativeAIControls>
   );
 }

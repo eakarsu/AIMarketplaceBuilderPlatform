@@ -20,9 +20,17 @@ export default function Login({ onLogin, showToast }) {
     }
   };
 
-  const fillCredentials = () => {
-    setEmail(process.env.REACT_APP_DEMO_EMAIL || '');
-    setPassword(process.env.REACT_APP_DEMO_PASSWORD || '');
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.post('/api/auth/demo');
+      onLogin(data.token);
+      showToast('Signed in with the existing demo account.', 'success');
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Demo login failed', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -59,8 +67,8 @@ export default function Login({ onLogin, showToast }) {
 
         <div className="quick-login">
           <p>Quick access for demo</p>
-          <button type="button" className="btn" onClick={fillCredentials}>
-            Auto Fill Demo Credentials
+          <button type="button" className="btn" onClick={handleDemoLogin} disabled={loading}>
+            {loading ? 'Signing in…' : 'Log in as Demo'}
           </button>
         </div>
       </div>

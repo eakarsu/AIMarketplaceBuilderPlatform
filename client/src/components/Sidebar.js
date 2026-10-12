@@ -1,3 +1,4 @@
+import AIReportLibrary from "./AIReportLibrary";
 import React from 'react';
 import { featureList } from '../featureConfig';
 
@@ -61,6 +62,6 @@ export default function Sidebar({ currentPage, setCurrentPage, onLogout }) {
           <span>Logout</span>
         </button>
       </div>
-    </div>
+    <AIReportLibrary /></div>
   );
 }

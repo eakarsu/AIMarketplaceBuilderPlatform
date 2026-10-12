@@ -177,7 +177,7 @@ export default function FeaturePage({ feature, showToast, setCurrentPage }) {
               {selectedItem[config.aiField] && (
                 <div className="detail-field">
                   <label>AI Generated Content</label>
-                  <AIOutput content={selectedItem[config.aiField]} />
+                  <AIOutput content={selectedItem[config.aiField]} title={`${config.title} result`} />
                 </div>
               )}
 
